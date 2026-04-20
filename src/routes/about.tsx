@@ -83,9 +83,9 @@ function AboutPage() {
               </Card>
             </div>
 
-            <Card className="p-6 mt-8 bg-amber-50 border-amber-200">
-              <h3 className="font-semibold mb-2 text-amber-900">Disclaimer</h3>
-              <p className="text-sm text-amber-900/80 leading-relaxed">
+            <Card className="p-6 mt-8 bg-accent/10 border-accent/30">
+              <h3 className="font-semibold mb-2 text-foreground">Disclaimer</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
                 Serenity is intended for educational and self-reflection purposes. It is not a diagnostic tool and
                 does not replace professional medical advice, diagnosis, or treatment. If you are concerned about
                 your mental health, please consult a qualified clinician.
