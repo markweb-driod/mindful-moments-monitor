@@ -1,53 +1,108 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { SiteLayout } from "@/components/SiteLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { ResultDisplay } from "@/components/ResultDisplay";
-import { buildAnalysis, saveAnalysis, type AnalysisResult, type VoiceFeatures, type FaceFeatures } from "@/lib/analyzer";
-import { Loader2, Layers, ArrowRight } from "lucide-react";
+import { ResultDisplay, type DisplayResult } from "@/components/ResultDisplay";
+import { runAnalyzeMultimodal } from "@/lib/api";
+import { Loader2, Layers, ArrowRight, Mic, Square, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/multimodal")({
   head: () => ({
     meta: [
       { title: "Multi-modal Analysis — Serenity" },
-      { name: "description", content: "Combine text, voice, and facial signals for richer mental health insights." },
-      { property: "og:title", content: "Multi-modal Analysis — Serenity" },
-      { property: "og:description", content: "Late-fusion of text, voice, and face." },
+      { name: "description", content: "Combine text, voice, and facial signals for richer insights." },
     ],
   }),
   component: MultimodalPage,
 });
 
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onloadend = () => res(r.result as string);
+    r.onerror = rej;
+    r.readAsDataURL(blob);
+  });
+}
+
 function MultimodalPage() {
   const [text, setText] = useState("");
-  const [useVoice, setUseVoice] = useState(true);
-  const [useFace, setUseFace] = useState(true);
-  const [voice, setVoice] = useState<VoiceFeatures>({ pitch: 200, energy: 0.5, speakingRate: 2.5, jitter: 0.25 });
-  const [face, setFace] = useState<FaceFeatures>({ smile: 0.4, browFurrow: 0.3, eyeOpenness: 0.6, mouthFrown: 0.2, jawTension: 0.3 });
-  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [useVoice, setUseVoice] = useState(false);
+  const [useFace, setUseFace] = useState(false);
+
+  const [recording, setRecording] = useState(false);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const recRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+
+  const [imgDataUrl, setImgDataUrl] = useState<string | null>(null);
+  const [imgPreview, setImgPreview] = useState<string | null>(null);
+
+  const [result, setResult] = useState<DisplayResult | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
 
+  const startRec = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mime = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/mp4";
+      const rec = new MediaRecorder(stream, { mimeType: mime });
+      chunksRef.current = [];
+      rec.ondataavailable = (e) => e.data.size > 0 && chunksRef.current.push(e.data);
+      rec.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: mime });
+        setAudioBlob(blob);
+        setAudioUrl(URL.createObjectURL(blob));
+        stream.getTracks().forEach((t) => t.stop());
+      };
+      rec.start();
+      recRef.current = rec;
+      setRecording(true);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Microphone error");
+    }
+  };
+  const stopRec = () => {
+    recRef.current?.stop();
+    setRecording(false);
+  };
+
+  const onUploadImg = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 6 * 1024 * 1024) return toast.error("Image too large (6MB max)");
+    const r = new FileReader();
+    r.onloadend = () => setImgDataUrl(r.result as string);
+    r.readAsDataURL(file);
+    setImgPreview(URL.createObjectURL(file));
+  };
+
   const onAnalyze = async () => {
-    if (!text.trim() && !useVoice && !useFace) {
-      toast.error("Please provide at least one modality");
+    if (!text.trim() && !(useVoice && audioBlob) && !(useFace && imgDataUrl)) {
+      toast.error("Provide at least one modality");
       return;
     }
     setAnalyzing(true);
-    await new Promise((r) => setTimeout(r, 700));
-    const r = buildAnalysis({
-      text: text.trim() || undefined,
-      voice: useVoice ? voice : undefined,
-      face: useFace ? face : undefined,
-    });
-    saveAnalysis(r);
-    setResult(r);
-    setAnalyzing(false);
+    try {
+      const audioDataUrl = useVoice && audioBlob ? await blobToDataUrl(audioBlob) : undefined;
+      const { analysis } = await runAnalyzeMultimodal({
+        text: text.trim() || undefined,
+        imageDataUrl: useFace ? imgDataUrl ?? undefined : undefined,
+        audioDataUrl,
+        audioMime: audioBlob?.type,
+      });
+      setResult(analysis);
+      toast.success("Multi-modal analysis complete");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Analysis failed");
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   return (
@@ -60,7 +115,7 @@ function MultimodalPage() {
             </div>
             <h1 className="font-display text-5xl font-semibold tracking-tight">Multi-modal Analysis</h1>
             <p className="text-muted-foreground mt-3 text-lg">
-              Combine all three signals. The system weighs each modality and fuses them into a single insight.
+              Combine text, voice, and a photo. The system fuses all signals into one insight.
             </p>
           </div>
 
@@ -78,54 +133,49 @@ function MultimodalPage() {
 
             <Card className="p-6 bg-card border-border">
               <div className="flex items-center justify-between mb-4">
-                <Label className="text-sm font-semibold">Voice features</Label>
+                <Label className="text-sm font-semibold">Voice</Label>
                 <Switch checked={useVoice} onCheckedChange={setUseVoice} />
               </div>
-              <div className={`space-y-4 ${useVoice ? "" : "opacity-40 pointer-events-none"}`}>
-                {([
-                  { key: "pitch", label: "Pitch", min: 80, max: 400, step: 1 },
-                  { key: "energy", label: "Energy", min: 0, max: 1, step: 0.01 },
-                  { key: "speakingRate", label: "Rate", min: 0.5, max: 5, step: 0.1 },
-                  { key: "jitter", label: "Jitter", min: 0, max: 1, step: 0.01 },
-                ] as const).map((f) => (
-                  <div key={f.key}>
-                    <div className="flex justify-between text-xs mb-1.5">
-                      <span>{f.label}</span>
-                      <span className="text-muted-foreground tabular-nums">{voice[f.key].toFixed(f.step < 1 ? 2 : 0)}</span>
-                    </div>
-                    <Slider value={[voice[f.key]]} min={f.min} max={f.max} step={f.step} onValueChange={(v) => setVoice((s) => ({ ...s, [f.key]: v[0] }))} />
-                  </div>
-                ))}
+              <div className={useVoice ? "" : "opacity-40 pointer-events-none"}>
+                <Button
+                  type="button"
+                  onClick={recording ? stopRec : startRec}
+                  variant={recording ? "destructive" : "outline"}
+                  className="w-full"
+                >
+                  {recording ? <><Square className="size-4 mr-1.5" /> Stop</> : <><Mic className="size-4 mr-1.5" /> {audioBlob ? "Re-record" : "Record"}</>}
+                </Button>
+                {audioUrl && <audio src={audioUrl} controls className="w-full mt-3" />}
               </div>
             </Card>
 
             <Card className="p-6 bg-card border-border">
               <div className="flex items-center justify-between mb-4">
-                <Label className="text-sm font-semibold">Facial features</Label>
+                <Label className="text-sm font-semibold">Facial photo</Label>
                 <Switch checked={useFace} onCheckedChange={setUseFace} />
               </div>
-              <div className={`space-y-4 ${useFace ? "" : "opacity-40 pointer-events-none"}`}>
-                {([
-                  { key: "smile", label: "Smile" },
-                  { key: "browFurrow", label: "Brow furrow" },
-                  { key: "eyeOpenness", label: "Eye openness" },
-                  { key: "mouthFrown", label: "Mouth frown" },
-                  { key: "jawTension", label: "Jaw tension" },
-                ] as const).map((f) => (
-                  <div key={f.key}>
-                    <div className="flex justify-between text-xs mb-1.5">
-                      <span>{f.label}</span>
-                      <span className="text-muted-foreground tabular-nums">{face[f.key].toFixed(2)}</span>
+              <label className={`block ${useFace ? "" : "opacity-40 pointer-events-none"}`}>
+                <div className="aspect-video rounded-lg border-2 border-dashed border-border bg-surface-2 grid place-items-center cursor-pointer overflow-hidden">
+                  {imgPreview ? (
+                    <img src={imgPreview} alt="Face" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="text-center text-muted-foreground text-xs">
+                      <Upload className="size-6 mx-auto mb-1" /> Upload photo
                     </div>
-                    <Slider value={[face[f.key]]} min={0} max={1} step={0.01} onValueChange={(v) => setFace((s) => ({ ...s, [f.key]: v[0] }))} />
-                  </div>
-                ))}
-              </div>
+                  )}
+                </div>
+                <input type="file" accept="image/*" className="hidden" onChange={onUploadImg} />
+              </label>
             </Card>
           </div>
 
           <div className="mt-8 flex justify-center">
-            <Button size="lg" onClick={onAnalyze} disabled={analyzing} className="bg-accent text-accent-foreground hover:bg-accent/90 px-8">
+            <Button
+              size="lg"
+              onClick={onAnalyze}
+              disabled={analyzing}
+              className="bg-accent text-accent-foreground hover:bg-accent/90 px-8"
+            >
               {analyzing ? <><Loader2 className="size-4 mr-2 animate-spin" /> Fusing signals</> : <>Run multi-modal analysis <ArrowRight className="size-4 ml-1" /></>}
             </Button>
           </div>

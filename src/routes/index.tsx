@@ -4,8 +4,8 @@ import { SiteLayout } from "@/components/SiteLayout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { ResultDisplay } from "@/components/ResultDisplay";
-import { buildAnalysis, saveAnalysis, type AnalysisResult } from "@/lib/analyzer";
+import { ResultDisplay, type DisplayResult } from "@/components/ResultDisplay";
+import { runAnalyzeText } from "@/lib/api";
 import { Mic, Camera, Layers, Sparkles, Brain, ShieldCheck, ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -27,7 +27,7 @@ const MAX_LEN = 2000;
 function HomePage() {
   const [text, setText] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
-  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [result, setResult] = useState<DisplayResult | null>(null);
 
   const validate = () => {
     const t = text.trim();
@@ -47,26 +47,24 @@ function HomePage() {
     if (!validate()) return;
     setAnalyzing(true);
     setResult(null);
-    await new Promise((r) => setTimeout(r, 700));
-    const r = buildAnalysis({ text });
-    saveAnalysis(r);
-    setResult(r);
-    setAnalyzing(false);
-    toast.success("Analysis complete");
-    setTimeout(() => {
-      document.getElementById("result")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 100);
+    try {
+      const { analysis } = await runAnalyzeText(text);
+      setResult(analysis);
+      toast.success("Analysis complete");
+      setTimeout(() => {
+        document.getElementById("result")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
+    } catch (err: any) {
+      toast.error(err?.message ?? "Analysis failed");
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   return (
     <SiteLayout>
-      {/* Hero */}
       <section className="relative overflow-hidden">
-        <div
-          className="absolute inset-0 -z-10 opacity-60"
-          style={{ background: "var(--gradient-calm)" }}
-          aria-hidden
-        />
+        <div className="absolute inset-0 -z-10 opacity-60" style={{ background: "var(--gradient-calm)" }} aria-hidden />
         <div className="container mx-auto px-6 py-20 md:py-28 grid md:grid-cols-2 gap-12 items-center">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-card/80 backdrop-blur border border-border text-xs font-medium text-muted-foreground mb-5">
@@ -77,8 +75,8 @@ function HomePage() {
               <span className="text-accent">Be held.</span>
             </h1>
             <p className="text-lg text-muted-foreground mt-6 max-w-prose leading-relaxed">
-              Share how you're feeling and let our intelligent system surface patterns across what you write, how
-              you speak, and how you look — so you can take care of your mind with insight.
+              Share how you're feeling and let our intelligent system surface patterns across what you write,
+              how you speak, and how you look — so you can take care of your mind with insight.
             </p>
             <div className="flex flex-wrap gap-3 mt-7">
               <a href="#analyze" className="inline-flex">
@@ -93,10 +91,10 @@ function HomePage() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             {[
-              { icon: Brain, title: "Text NLP", desc: "Lexical & contextual sentiment scoring" },
-              { icon: Mic, title: "Voice cues", desc: "Pitch, energy, jitter analysis" },
-              { icon: Camera, title: "Facial signals", desc: "Smile, brow, jaw tension" },
-              { icon: ShieldCheck, title: "Private", desc: "Stays on your device" },
+              { icon: Brain, title: "Text NLP", desc: "AI sentiment & risk detection" },
+              { icon: Mic, title: "Voice cues", desc: "Tone & speech analysis" },
+              { icon: Camera, title: "Facial signals", desc: "Vision-based emotion read" },
+              { icon: ShieldCheck, title: "Private", desc: "Your data, your account" },
             ].map((f) => (
               <Card key={f.title} className="p-5 bg-card/80 backdrop-blur border-border">
                 <f.icon className="size-6 text-primary mb-3" />
@@ -108,7 +106,6 @@ function HomePage() {
         </div>
       </section>
 
-      {/* Text Input - core 4.5.1, 4.5.2 */}
       <section id="analyze" className="container mx-auto px-6 py-16">
         <div className="max-w-3xl mx-auto text-center mb-10">
           <h2 className="font-display text-4xl font-semibold tracking-tight">How are you feeling today?</h2>
@@ -135,26 +132,10 @@ function HomePage() {
                 <span>· min {MIN_LEN}</span>
               </div>
               <div className="flex items-center gap-2">
-                <Link to="/voice">
-                  <Button type="button" variant="outline" size="sm">
-                    <Mic className="size-4 mr-1.5" /> Add voice
-                  </Button>
-                </Link>
-                <Link to="/face">
-                  <Button type="button" variant="outline" size="sm">
-                    <Camera className="size-4 mr-1.5" /> Add face
-                  </Button>
-                </Link>
-                <Button
-                  type="submit"
-                  disabled={analyzing}
-                  className="bg-accent text-accent-foreground hover:bg-accent/90"
-                >
-                  {analyzing ? (
-                    <><Loader2 className="size-4 mr-1.5 animate-spin" /> Analyzing</>
-                  ) : (
-                    <>Analyze <ArrowRight className="size-4 ml-1" /></>
-                  )}
+                <Link to="/voice"><Button type="button" variant="outline" size="sm"><Mic className="size-4 mr-1.5" /> Add voice</Button></Link>
+                <Link to="/face"><Button type="button" variant="outline" size="sm"><Camera className="size-4 mr-1.5" /> Add face</Button></Link>
+                <Button type="submit" disabled={analyzing} className="bg-accent text-accent-foreground hover:bg-accent/90">
+                  {analyzing ? (<><Loader2 className="size-4 mr-1.5 animate-spin" /> Analyzing</>) : (<>Analyze <ArrowRight className="size-4 ml-1" /></>)}
                 </Button>
               </div>
             </div>
@@ -168,7 +149,6 @@ function HomePage() {
         )}
       </section>
 
-      {/* CTA strip */}
       <section className="container mx-auto px-6 pb-10">
         <Card className="p-8 md:p-10 bg-gradient-to-br from-primary/15 via-card to-accent/15 border-border">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
