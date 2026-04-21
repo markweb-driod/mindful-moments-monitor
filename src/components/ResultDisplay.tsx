@@ -1,18 +1,38 @@
-import type { AnalysisResult } from "@/lib/analyzer";
-import { EMOTION_COLORS } from "@/lib/analyzer";
 import { Card } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, Sparkles, Activity } from "lucide-react";
 
-const RISK_BADGE: Record<AnalysisResult["risk"], { label: string; cls: string }> = {
+export type EmotionLabel =
+  | "Joyful" | "Content" | "Neutral" | "Anxious" | "Sad" | "Stressed" | "Angry" | "Depressed";
+export type RiskLevel = "low" | "moderate" | "elevated" | "high";
+
+export interface DisplayResult {
+  fused: { label: EmotionLabel | string; confidence: number; scores: Record<string, number> };
+  risk: RiskLevel;
+  wellbeingScore: number;
+  highlights: string[];
+  suggestions: string[];
+}
+
+export const EMOTION_COLORS: Record<string, string> = {
+  Joyful: "oklch(80% 0.18 90)",
+  Content: "oklch(78% 0.10 160)",
+  Neutral: "oklch(75% 0.03 200)",
+  Anxious: "oklch(70% 0.15 60)",
+  Sad: "oklch(60% 0.12 250)",
+  Stressed: "oklch(65% 0.18 30)",
+  Angry: "oklch(60% 0.22 25)",
+  Depressed: "oklch(45% 0.10 270)",
+};
+
+const RISK_BADGE: Record<RiskLevel, { label: string; cls: string }> = {
   low: { label: "Low risk", cls: "bg-emerald-100 text-emerald-800" },
   moderate: { label: "Moderate", cls: "bg-amber-100 text-amber-800" },
   elevated: { label: "Elevated", cls: "bg-orange-100 text-orange-900" },
   high: { label: "High — please seek support", cls: "bg-red-100 text-red-900" },
 };
 
-export function ResultDisplay({ result }: { result: AnalysisResult }) {
+export function ResultDisplay({ result }: { result: DisplayResult }) {
   const risk = RISK_BADGE[result.risk];
   const sortedScores = Object.entries(result.fused.scores).sort((a, b) => b[1] - a[1]);
 
@@ -49,7 +69,7 @@ export function ResultDisplay({ result }: { result: AnalysisResult }) {
                     className="h-full rounded-full transition-all"
                     style={{
                       width: `${val * 100}%`,
-                      background: EMOTION_COLORS[label as keyof typeof EMOTION_COLORS],
+                      background: EMOTION_COLORS[label] ?? "oklch(70% 0.05 200)",
                     }}
                   />
                 </div>
@@ -61,7 +81,7 @@ export function ResultDisplay({ result }: { result: AnalysisResult }) {
 
       {result.highlights.length > 0 && (
         <Card className="p-6 bg-card border-border">
-          <h3 className="font-display text-xl font-semibold mb-3">Modality breakdown</h3>
+          <h3 className="font-display text-xl font-semibold mb-3">Observations</h3>
           <ul className="space-y-2">
             {result.highlights.map((h, i) => (
               <li key={i} className="text-sm text-muted-foreground flex gap-2">
@@ -79,10 +99,7 @@ export function ResultDisplay({ result }: { result: AnalysisResult }) {
         </h3>
         <ul className="space-y-3">
           {result.suggestions.map((s, i) => (
-            <li
-              key={i}
-              className="p-4 rounded-xl bg-surface-2 text-sm leading-relaxed"
-            >
+            <li key={i} className="p-4 rounded-xl bg-surface-2 text-sm leading-relaxed">
               {s}
             </li>
           ))}
