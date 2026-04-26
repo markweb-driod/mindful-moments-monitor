@@ -1,1 +1,10 @@
 project_id = "phdhjvvyinbkxytnzwme"
+
+[analytics]
+enabled = false
+
+[storage]
+enabled = false
+
+[studio]
+enabled = false

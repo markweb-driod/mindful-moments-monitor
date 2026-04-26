@@ -34,7 +34,16 @@ export const Route = createRootRoute({
       { title: "Serenity — Mental Health Monitoring" },
       { name: "description", content: "Multi-modal mental health monitoring using intelligent techniques." },
     ],
-    links: [{ rel: "stylesheet", href: appCss }],
+    links: [
+      { rel: "stylesheet", href: appCss },
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
+      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap",
+      },
+      { rel: "icon", href: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"%3E%3Ctext y="0.9em" font-size="52"%3E%F0%9F%8C%BF%3C/text%3E%3C/svg%3E' },
+    ],
   }),
   shellComponent: RootShell,
   component: RootComponent,

@@ -2,11 +2,28 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
+function resolveClientSupabaseConfig() {
+  const urlFromEnv = import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+  const keyFromEnv = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
+
+  const isDev = Boolean(import.meta.env.DEV);
+  const isBrowser = typeof window !== 'undefined';
+  const isLocalHost =
+    isBrowser &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+  // In local browser development, prefer local Supabase to avoid stale remote env injection.
+  const url = isDev && isLocalHost ? (urlFromEnv === 'https://phdhjvvyinbkxytnzwme.supabase.co' ? 'http://127.0.0.1:54321' : urlFromEnv) : urlFromEnv;
+  const key =
+    isDev && isLocalHost
+      ? (keyFromEnv || 'sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH')
+      : keyFromEnv;
+
+  return { url, key };
+}
+
 function createSupabaseClient() {
-  // Use import.meta.env for client-side (Vite build-time replacement)
-  // Fall back to process.env for SSR (server-side rendering)
-  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-  const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
+  const { url: SUPABASE_URL, key: SUPABASE_PUBLISHABLE_KEY } = resolveClientSupabaseConfig();
 
   if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
     throw new Error(
