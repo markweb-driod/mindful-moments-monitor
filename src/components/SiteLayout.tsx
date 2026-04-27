@@ -1,9 +1,10 @@
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
-import { Heart, History, BookOpen, Info, Mic, Camera, Layers, Home, LogOut, User as UserIcon, Loader2 } from "lucide-react";
+import { History, BookOpen, Info, Mic, Camera, Layers, Home, LogOut, User as UserIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { useEffect, type ReactNode } from "react";
+import logo from "@/assets/serenity-logo.png";
 
 const NAV = [
   { to: "/", label: "Home", icon: Home },
