@@ -14,6 +14,12 @@ const isBuild = process.argv.some((a) => a === "build");
 export default defineConfig({
   cloudflare: false,
   vite: {
+    define: {
+      "import.meta.env.VITE_SUPABASE_URL": JSON.stringify("https://phdhjvvyinbkxytnzwme.supabase.co"),
+      "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBoZGhqdnZ5aW5ia3h5dG56d21lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3MTM5MTcsImV4cCI6MjA5MjI4OTkxN30.v2o8pP13Z-QQV3Lcpw91dtI0nHiti8t6v9EvuqymiKQ"
+      ),
+    },
     plugins: isBuild ? [nitro({ preset: "vercel" })] : [],
   },
 });
