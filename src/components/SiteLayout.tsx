@@ -20,6 +20,10 @@ export function SiteLayout({ children, requireAuth = true }: { children: ReactNo
   const navigate = useNavigate();
   const { user, loading, signOut } = useAuth();
 
+  const navItems = user
+    ? NAV
+    : NAV.filter((item) => item.to === "/" || item.to === "/resources" || item.to === "/about");
+
   useEffect(() => {
     if (!loading && requireAuth && !user) {
       navigate({ to: "/auth" });
@@ -45,7 +49,7 @@ export function SiteLayout({ children, requireAuth = true }: { children: ReactNo
             <span className="font-display text-xl font-semibold tracking-tight">Serenity</span>
           </Link>
           <nav className="hidden md:flex items-center gap-1">
-            {NAV.map((item) => {
+            {navItems.map((item) => {
               const active = loc.pathname === item.to;
               return (
                 <Link
@@ -64,7 +68,7 @@ export function SiteLayout({ children, requireAuth = true }: { children: ReactNo
             })}
           </nav>
           <div className="hidden md:flex items-center gap-2">
-            {user && (
+            {user ? (
               <>
                 <span className="text-xs text-muted-foreground flex items-center gap-1.5">
                   <UserIcon className="size-3.5" />
@@ -74,12 +78,18 @@ export function SiteLayout({ children, requireAuth = true }: { children: ReactNo
                   <LogOut className="size-4" />
                 </Button>
               </>
+            ) : (
+              <Link to="/auth">
+                <Button size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90">
+                  Sign in
+                </Button>
+              </Link>
             )}
           </div>
         </div>
         {/* Mobile nav */}
         <nav className="md:hidden flex overflow-x-auto gap-1 px-4 pb-3">
-          {NAV.map((item) => {
+          {navItems.map((item) => {
             const Icon = item.icon;
             const active = loc.pathname === item.to;
             return (
@@ -95,13 +105,20 @@ export function SiteLayout({ children, requireAuth = true }: { children: ReactNo
               </Link>
             );
           })}
-          {user && (
+          {user ? (
             <button
               onClick={() => signOut()}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-surface-2 text-muted-foreground"
             >
               <LogOut className="size-3.5" /> Sign out
             </button>
+          ) : (
+            <Link
+              to="/auth"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-accent text-accent-foreground"
+            >
+              <UserIcon className="size-3.5" /> Sign in
+            </Link>
           )}
         </nav>
       </header>
