@@ -6,8 +6,9 @@ import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { ResultDisplay, type DisplayResult } from "@/components/ResultDisplay";
 import { runAnalyzeText } from "@/lib/api";
-import { Mic, Camera, Layers, Sparkles, Brain, ShieldCheck, ArrowRight, Loader2 } from "lucide-react";
+import { Mic, Camera, Layers, Sparkles, Brain, ShieldCheck, ArrowRight, Loader2, Lock, Heart, Activity } from "lucide-react";
 import { toast } from "sonner";
+import heroImg from "@/assets/hero-bloom.jpg";
 
 export const Route = createFileRoute("/")({
   head: () => ({
