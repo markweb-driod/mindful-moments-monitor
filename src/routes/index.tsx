@@ -62,7 +62,7 @@ function HomePage() {
   };
 
   return (
-    <SiteLayout>
+    <SiteLayout requireAuth={false}>
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 -z-10 opacity-60" style={{ background: "var(--gradient-calm)" }} aria-hidden />
         <div className="container mx-auto px-6 py-20 md:py-28 grid md:grid-cols-2 gap-12 items-center">
@@ -79,11 +79,11 @@ function HomePage() {
               how you speak, and how you look — so you can take care of your mind with insight.
             </p>
             <div className="flex flex-wrap gap-3 mt-7">
-              <a href="#analyze" className="inline-flex">
+              <Link to="/auth" className="inline-flex">
                 <Button size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90 shadow-[var(--shadow-soft)]">
-                  Start a session <ArrowRight className="size-4 ml-1" />
+                  Get started <ArrowRight className="size-4 ml-1" />
                 </Button>
-              </a>
+              </Link>
               <Link to="/multimodal">
                 <Button size="lg" variant="outline">Try multi-modal</Button>
               </Link>
