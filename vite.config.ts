@@ -5,7 +5,15 @@
 //     error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... } }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import { nitro } from "nitro/vite";
+
+// Only activate the Nitro Vercel preset during production builds.
+// This avoids plugin conflicts with Vite HMR in dev mode.
+const isBuild = process.argv.some((a) => a === "build");
 
 export default defineConfig({
-  // Keep wrapper defaults to avoid duplicate/conflicting plugin wiring in dev.
+  cloudflare: false,
+  vite: {
+    plugins: isBuild ? [nitro({ preset: "vercel" })] : [],
+  },
 });
