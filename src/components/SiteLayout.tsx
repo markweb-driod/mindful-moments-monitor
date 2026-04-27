@@ -44,8 +44,8 @@ export function SiteLayout({ children, requireAuth = true }: { children: ReactNo
       <header className="sticky top-0 z-30 border-b border-border bg-surface-1/85 backdrop-blur-md">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between gap-6">
           <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="size-9 rounded-xl bg-gradient-to-br from-primary to-accent grid place-items-center shadow-[var(--shadow-soft)]">
-              <Heart className="size-5 text-primary-foreground" strokeWidth={2.5} />
+            <div className="size-10 rounded-xl bg-card border border-border grid place-items-center shadow-[var(--shadow-soft)] overflow-hidden p-1">
+              <img src={logo} alt="Serenity logo" width={40} height={40} className="size-full object-contain" />
             </div>
             <span className="font-display text-xl font-semibold tracking-tight">Serenity</span>
           </Link>
