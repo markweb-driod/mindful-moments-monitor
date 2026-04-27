@@ -6,8 +6,9 @@ import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { ResultDisplay, type DisplayResult } from "@/components/ResultDisplay";
 import { runAnalyzeText } from "@/lib/api";
-import { Mic, Camera, Layers, Sparkles, Brain, ShieldCheck, ArrowRight, Loader2 } from "lucide-react";
+import { Mic, Camera, Layers, Sparkles, Brain, ShieldCheck, ArrowRight, Loader2, Lock, Heart, Activity } from "lucide-react";
 import { toast } from "sonner";
+import heroImg from "@/assets/hero-bloom.jpg";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -63,45 +64,67 @@ function HomePage() {
 
   return (
     <SiteLayout requireAuth={false}>
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 -z-10 opacity-60" style={{ background: "var(--gradient-calm)" }} aria-hidden />
-        <div className="container mx-auto px-6 py-20 md:py-28 grid md:grid-cols-2 gap-12 items-center">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-card/80 backdrop-blur border border-border text-xs font-medium text-muted-foreground mb-5">
-              <Sparkles className="size-3.5 text-accent" /> Intelligent multi-modal analysis
+      <section className="relative overflow-hidden border-b border-border">
+        <div className="absolute inset-0 -z-10" style={{ background: "var(--gradient-hero)" }} aria-hidden />
+        <div className="container mx-auto px-6 pt-16 pb-20 md:pt-24 md:pb-28 grid md:grid-cols-12 gap-10 lg:gap-14 items-center">
+          <div className="md:col-span-7">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-card border border-border text-xs font-semibold text-foreground/80 mb-6 shadow-[var(--shadow-soft)]">
+              <Sparkles className="size-3.5 text-accent" />
+              Multi-modal AI · Text · Voice · Face
             </div>
-            <h1 className="font-display text-5xl md:text-6xl font-semibold tracking-tight leading-[1.05]">
+            <h1 className="font-display text-5xl md:text-6xl lg:text-7xl font-semibold tracking-tight leading-[1.02] text-foreground">
               Find clarity. <br />
-              <span className="text-accent">Be held.</span>
+              <span className="bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">Be held.</span>
             </h1>
-            <p className="text-lg text-muted-foreground mt-6 max-w-prose leading-relaxed">
-              Share how you're feeling and let our intelligent system surface patterns across what you write,
-              how you speak, and how you look — so you can take care of your mind with insight.
+            <p className="text-lg md:text-xl text-foreground/75 mt-6 max-w-xl leading-relaxed">
+              Serenity reads what you write, how you speak, and how you look — surfacing patterns
+              in your wellbeing so you can act with insight, not guesswork.
             </p>
-            <div className="flex flex-wrap gap-3 mt-7">
+            <div className="flex flex-wrap gap-3 mt-8">
               <Link to="/auth" className="inline-flex">
-                <Button size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90 shadow-[var(--shadow-soft)]">
-                  Get started <ArrowRight className="size-4 ml-1" />
+                <Button size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90 shadow-[var(--shadow-glow)] h-12 px-6 text-base">
+                  Get started free <ArrowRight className="size-4 ml-1" />
                 </Button>
               </Link>
-              <Link to="/multimodal">
-                <Button size="lg" variant="outline">Try multi-modal</Button>
-              </Link>
+              <a href="#analyze">
+                <Button size="lg" variant="outline" className="h-12 px-6 text-base border-foreground/15 hover:bg-card">
+                  Try it now
+                </Button>
+              </a>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-8 text-xs font-medium text-foreground/60">
+              <span className="inline-flex items-center gap-1.5"><Lock className="size-3.5" /> End-to-end private</span>
+              <span className="inline-flex items-center gap-1.5"><Heart className="size-3.5" /> Built with care</span>
+              <span className="inline-flex items-center gap-1.5"><Activity className="size-3.5" /> Real AI inference</span>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            {[
-              { icon: Brain, title: "Text NLP", desc: "AI sentiment & risk detection" },
-              { icon: Mic, title: "Voice cues", desc: "Tone & speech analysis" },
-              { icon: Camera, title: "Facial signals", desc: "Vision-based emotion read" },
-              { icon: ShieldCheck, title: "Private", desc: "Your data, your account" },
-            ].map((f) => (
-              <Card key={f.title} className="p-5 bg-card/80 backdrop-blur border-border">
-                <f.icon className="size-6 text-primary mb-3" />
-                <h3 className="font-semibold text-sm">{f.title}</h3>
-                <p className="text-xs text-muted-foreground mt-1">{f.desc}</p>
-              </Card>
-            ))}
+
+          <div className="md:col-span-5 relative">
+            <div className="relative rounded-3xl overflow-hidden shadow-[var(--shadow-glow)] border border-border/60 aspect-square">
+              <img
+                src={heroImg}
+                alt="Calming abstract waveform representing emotional wellbeing"
+                width={1280}
+                height={1280}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-x-4 bottom-4 grid grid-cols-2 gap-2.5">
+                {[
+                  { icon: Brain, title: "Text", desc: "Sentiment & risk" },
+                  { icon: Mic, title: "Voice", desc: "Tone & speech" },
+                  { icon: Camera, title: "Face", desc: "Vision read" },
+                  { icon: ShieldCheck, title: "Private", desc: "Your data only" },
+                ].map((f) => (
+                  <div key={f.title} className="px-3 py-2.5 rounded-xl bg-card/95 backdrop-blur-md border border-border/70 flex items-center gap-2.5">
+                    <f.icon className="size-4 text-accent shrink-0" />
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-foreground leading-tight">{f.title}</div>
+                      <div className="text-[10px] text-muted-foreground leading-tight truncate">{f.desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </section>
