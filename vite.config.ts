@@ -5,9 +5,14 @@
 //     error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... } }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import { nitro } from "nitro/vite";
+
+const isBuild = process.argv.some((a) => a === "build");
 
 export default defineConfig({
+  cloudflare: false,
   vite: {
+    plugins: isBuild ? [nitro({ preset: "vercel" })] : [],
     define: {
       "import.meta.env.VITE_SUPABASE_URL": JSON.stringify("https://phdhjvvyinbkxytnzwme.supabase.co"),
       "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(

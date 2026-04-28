@@ -42,13 +42,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) throw error;
     },
     async signUpWithEmail(email, password) {
-      const redirectTo = typeof window !== "undefined" ? window.location.origin : undefined;
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { emailRedirectTo: redirectTo },
-      });
+      const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) throw error;
+      // If Supabase returned no session (email confirmation still on), sign in immediately
+      if (!data.session) {
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+        if (signInError) throw signInError;
+      }
     },
     async signOut() {
       await supabase.auth.signOut();

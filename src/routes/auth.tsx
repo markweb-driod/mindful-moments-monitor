@@ -95,7 +95,7 @@ function AuthPage() {
               <Button
                 disabled={busy || !email || password.length < 8}
                 className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
-                onClick={() => wrap(() => signUpWithEmail(email, password), "Account created")}
+                onClick={() => wrap(() => signUpWithEmail(email, password), "Account created — you're signed in")}
               >
                 {busy ? <Loader2 className="size-4 animate-spin" /> : "Create account"}
               </Button>
