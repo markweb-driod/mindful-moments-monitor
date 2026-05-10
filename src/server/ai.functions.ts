@@ -411,16 +411,24 @@ export const analyzeText = createServerFn({ method: "POST" })
       };
     } catch {
       // Keep analysis available even if external AI is temporarily unavailable.
-      const { buildAnalysis } = await import("@/lib/analyzer");
-      const local = buildAnalysis({ text: data.text });
-      const textMod = local.modalities.text || local.fused;
+      const { analyzeText: localAnalyzeText, computeRisk } = await import("@/lib/analyzer");
+      const textMod = localAnalyzeText(data.text);
+      const localRisk = computeRisk(textMod as any, data.text);
+      const wellbeing = Math.max(0, Math.min(100, Math.round(70 - localRisk.score * 12)));
       analysis = {
         modalities: { text: textMod },
-        fused: local.fused,
-        risk: local.risk,
-        wellbeingScore: local.wellbeingScore,
-        highlights: [...local.highlights, "Used local fallback analysis due to temporary AI service issue."],
-        suggestions: local.suggestions,
+        fused: textMod,
+        risk: localRisk.risk,
+        wellbeingScore: wellbeing,
+        highlights: [
+          `Text signal: ${textMod.label} (${Math.round(textMod.confidence * 100)}%)`,
+          "Used local fallback analysis due to temporary AI service issue.",
+        ],
+        suggestions: [
+          "Take a short pause and slow your breathing for one minute.",
+          "Drink water and have a small nourishing meal if possible.",
+          "Pick one tiny next step and complete it to rebuild momentum.",
+        ],
         inputPreview: data.text.slice(0, 200),
       };
     }
