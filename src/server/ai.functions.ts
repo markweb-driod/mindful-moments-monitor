@@ -125,8 +125,12 @@ async function callGemini(
     suggestions: string[];
   }
 > {
-  const GEMINI_API_KEY =
-    process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.LOVABLE_API_KEY;
+  const GEMINI_API_KEY = (
+    process.env.GEMINI_API_KEY ||
+    process.env.GOOGLE_API_KEY ||
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
+    process.env.LOVABLE_API_KEY
+  )?.trim();
   if (!GEMINI_API_KEY) {
     throw new Error("GEMINI_API_KEY is not configured");
   }
