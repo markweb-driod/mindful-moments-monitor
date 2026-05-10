@@ -49,14 +49,34 @@ function HomePage() {
     setAnalyzing(true);
     setResult(null);
     try {
-      const { analysis } = await runAnalyzeText(text);
+      const response = await runAnalyzeText(text);
+      const analysis = response?.analysis;
+      if (!analysis?.fused || !analysis?.suggestions) {
+        throw new Error("Invalid analysis response");
+      }
       setResult(analysis);
       toast.success("Analysis complete");
       setTimeout(() => {
         document.getElementById("result")?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 100);
     } catch (err: any) {
-      toast.error(err?.message ?? "Analysis failed");
+      try {
+        const { buildAnalysis } = await import("@/lib/analyzer");
+        const local = buildAnalysis({ text });
+        setResult({
+          fused: local.fused,
+          risk: local.risk,
+          wellbeingScore: local.wellbeingScore,
+          highlights: local.highlights,
+          suggestions: local.suggestions,
+        });
+        toast.error("Server analysis unavailable. Showing local fallback.");
+        setTimeout(() => {
+          document.getElementById("result")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 100);
+      } catch {
+        toast.error(err?.message ?? "Analysis failed");
+      }
     } finally {
       setAnalyzing(false);
     }
