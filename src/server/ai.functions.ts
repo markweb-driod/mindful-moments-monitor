@@ -19,6 +19,7 @@ type Emotion = (typeof EMOTIONS)[number];
 
 const RISK_LEVELS = ["low", "moderate", "elevated", "high"] as const;
 const MODALITIES = ["text", "voice", "face", "multimodal"] as const;
+const ANALYSES_COLLECTION = "analyses";
 
 interface ModalityScore {
   label: Emotion;
@@ -35,6 +36,22 @@ interface AIAnalysis {
   suggestions: string[];
   inputPreview: string;
   transcript?: string;
+}
+
+interface StoredAnalysis {
+  id: string;
+  created_at: string;
+  user_id: string;
+  modality_input: (typeof MODALITIES)[number];
+  predicted_label: Emotion;
+  confidence: number;
+  wellbeing_score: number;
+  risk_level: (typeof RISK_LEVELS)[number];
+  scores: Record<Emotion, number>;
+  modalities: AIAnalysis["modalities"];
+  highlights: string[];
+  suggestions: string[];
+  input_preview: string | null;
 }
 
 type GeminiPart =
@@ -222,26 +239,105 @@ function fuseModalities(mods: AIAnalysis["modalities"]): ModalityScore {
   return { label: best, confidence: bestVal, scores: fused };
 }
 
+function buildPersistPayload(
+  userId: string,
+  modality: (typeof MODALITIES)[number],
+  analysis: AIAnalysis,
+): Omit<StoredAnalysis, "id"> {
+  return {
+    created_at: new Date().toISOString(),
+    user_id: userId,
+    modality_input: modality,
+    predicted_label: analysis.fused.label,
+    confidence: analysis.fused.confidence,
+    wellbeing_score: analysis.wellbeingScore,
+    risk_level: analysis.risk,
+    scores: analysis.fused.scores,
+    modalities: analysis.modalities,
+    highlights: analysis.highlights,
+    suggestions: analysis.suggestions,
+    input_preview: analysis.inputPreview,
+  };
+}
+
+async function persistAnalysisToFirebase(
+  userId: string,
+  modality: (typeof MODALITIES)[number],
+  analysis: AIAnalysis,
+): Promise<{ id: string } | null> {
+  const { getFirestoreAdmin } = await import("@/integrations/firebase/admin.server");
+  const db = getFirestoreAdmin();
+  if (!db) return null;
+
+  const ref = await db.collection(ANALYSES_COLLECTION).add(buildPersistPayload(userId, modality, analysis));
+  return { id: ref.id };
+}
+
+async function fetchHistoryFromFirebase(userId: string): Promise<StoredAnalysis[] | null> {
+  const { getFirestoreAdmin } = await import("@/integrations/firebase/admin.server");
+  const db = getFirestoreAdmin();
+  if (!db) return null;
+
+  const snapshot = await db
+    .collection(ANALYSES_COLLECTION)
+    .where("user_id", "==", userId)
+    .limit(200)
+    .get();
+
+  const items = snapshot.docs.map((doc) => {
+    const raw = doc.data() as Omit<StoredAnalysis, "id">;
+    return {
+      id: doc.id,
+      ...raw,
+      created_at: raw.created_at || new Date(0).toISOString(),
+      input_preview: raw.input_preview ?? null,
+    } as StoredAnalysis;
+  });
+
+  return items
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .slice(0, 100);
+}
+
+async function clearHistoryFromFirebase(userId: string): Promise<boolean> {
+  const { getFirestoreAdmin } = await import("@/integrations/firebase/admin.server");
+  const db = getFirestoreAdmin();
+  if (!db) return false;
+
+  const snapshot = await db.collection(ANALYSES_COLLECTION).where("user_id", "==", userId).get();
+  if (snapshot.empty) return true;
+
+  const batch = db.batch();
+  snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+  await batch.commit();
+  return true;
+}
+
 async function persistAnalysis(
   supabase: SupabaseClient<Database>,
   userId: string,
   modality: (typeof MODALITIES)[number],
   analysis: AIAnalysis,
 ) {
+  // Prefer Firebase if configured. Fall back to Supabase for compatibility.
+  const firebaseSaved = await persistAnalysisToFirebase(userId, modality, analysis).catch(() => null);
+  if (firebaseSaved) return firebaseSaved;
+
+  const payload = buildPersistPayload(userId, modality, analysis);
   const { data, error } = await supabase
     .from("analyses")
     .insert({
-      user_id: userId,
-      modality_input: modality,
-      predicted_label: analysis.fused.label,
-      confidence: analysis.fused.confidence,
-      wellbeing_score: analysis.wellbeingScore,
-      risk_level: analysis.risk,
-      scores: analysis.fused.scores as unknown as Json,
-      modalities: analysis.modalities as unknown as Json,
-      highlights: analysis.highlights as unknown as Json,
-      suggestions: analysis.suggestions as unknown as Json,
-      input_preview: analysis.inputPreview,
+      user_id: payload.user_id,
+      modality_input: payload.modality_input,
+      predicted_label: payload.predicted_label,
+      confidence: payload.confidence,
+      wellbeing_score: payload.wellbeing_score,
+      risk_level: payload.risk_level,
+      scores: payload.scores as unknown as Json,
+      modalities: payload.modalities as unknown as Json,
+      highlights: payload.highlights as unknown as Json,
+      suggestions: payload.suggestions as unknown as Json,
+      input_preview: payload.input_preview,
     })
     .select()
     .single();
@@ -252,17 +348,17 @@ async function persistAnalysis(
       const { data: fallbackData, error: fallbackError } = await supabaseAdmin
         .from("analyses")
         .insert({
-          user_id: userId,
-          modality_input: modality,
-          predicted_label: analysis.fused.label,
-          confidence: analysis.fused.confidence,
-          wellbeing_score: analysis.wellbeingScore,
-          risk_level: analysis.risk,
-          scores: analysis.fused.scores as unknown as Json,
-          modalities: analysis.modalities as unknown as Json,
-          highlights: analysis.highlights as unknown as Json,
-          suggestions: analysis.suggestions as unknown as Json,
-          input_preview: analysis.inputPreview,
+          user_id: payload.user_id,
+          modality_input: payload.modality_input,
+          predicted_label: payload.predicted_label,
+          confidence: payload.confidence,
+          wellbeing_score: payload.wellbeing_score,
+          risk_level: payload.risk_level,
+          scores: payload.scores as unknown as Json,
+          modalities: payload.modalities as unknown as Json,
+          highlights: payload.highlights as unknown as Json,
+          suggestions: payload.suggestions as unknown as Json,
+          input_preview: payload.input_preview,
         })
         .select()
         .single();
@@ -471,4 +567,30 @@ export const analyzeMultimodal = createServerFn({ method: "POST" })
     };
     const saved = await persistAnalysis(context.supabase, context.userId, "multimodal", analysis);
     return { analysis, id: saved.id };
+  });
+
+export const fetchAnalysisHistory = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const firebaseHistory = await fetchHistoryFromFirebase(context.userId).catch(() => null);
+    if (firebaseHistory) return { items: firebaseHistory };
+
+    const { data, error } = await context.supabase
+      .from("analyses")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (error) throw error;
+    return { items: (data ?? []) as unknown as StoredAnalysis[] };
+  });
+
+export const clearAnalysisHistory = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const firebaseCleared = await clearHistoryFromFirebase(context.userId).catch(() => false);
+    if (firebaseCleared) return { ok: true };
+
+    const { error } = await context.supabase.from("analyses").delete().eq("user_id", context.userId);
+    if (error) throw error;
+    return { ok: true };
   });

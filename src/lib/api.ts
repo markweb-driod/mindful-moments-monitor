@@ -1,5 +1,12 @@
 // Client helpers that call TanStack server functions with the user's auth token.
-import { analyzeText, analyzeFace, analyzeVoice, analyzeMultimodal } from "@/server/ai.functions";
+import {
+  analyzeText,
+  analyzeFace,
+  analyzeVoice,
+  analyzeMultimodal,
+  fetchAnalysisHistory,
+  clearAnalysisHistory,
+} from "@/server/ai.functions";
 import { getAccessToken } from "@/lib/auth-context";
 
 async function withAuth<T>(fn: (headers: HeadersInit) => Promise<T>): Promise<T> {
@@ -30,8 +37,7 @@ export async function runAnalyzeMultimodal(input: {
   return withAuth((headers) => analyzeMultimodal({ data: input, headers }));
 }
 
-// Read history client-side via supabase
-import { supabase } from "@/integrations/supabase/client";
+type HistoryServerResponse = Awaited<ReturnType<typeof fetchAnalysisHistory>>;
 
 export interface HistoryRow {
   id: string;
@@ -48,18 +54,12 @@ export interface HistoryRow {
 }
 
 export async function fetchHistory(): Promise<HistoryRow[]> {
-  const { data, error } = await supabase
-    .from("analyses")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(100);
-  if (error) throw error;
-  return (data ?? []) as unknown as HistoryRow[];
+  return withAuth(async (headers) => {
+    const { items } = (await fetchAnalysisHistory({ headers })) as HistoryServerResponse;
+    return items as unknown as HistoryRow[];
+  });
 }
 
 export async function clearHistoryRemote() {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) return;
-  const { error } = await supabase.from("analyses").delete().eq("user_id", u.user.id);
-  if (error) throw error;
+  await withAuth((headers) => clearAnalysisHistory({ headers }));
 }
