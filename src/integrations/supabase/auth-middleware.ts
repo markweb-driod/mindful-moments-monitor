@@ -28,12 +28,27 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
     // Firebase ID token verification (required)
     try {
       const { getFirebaseAdminAuth } = await import('@/integrations/firebase/admin.server');
-      const firebaseAuth = getFirebaseAdminAuth();
-      if (!firebaseAuth) {
-        throw new Response('Unauthorized: Firebase not configured', { status: 401 });
+      let firebaseAuth;
+      try {
+        firebaseAuth = getFirebaseAdminAuth();
+      } catch (initError) {
+        throw new Response(
+          `Server Error: Firebase initialization failed - ${initError instanceof Error ? initError.message : 'unknown error'}`,
+          { status: 500 }
+        );
       }
 
-      const decoded = await firebaseAuth.verifyIdToken(token);
+      if (!firebaseAuth) {
+        throw new Response('Server Error: Firebase not configured', { status: 500 });
+      }
+
+      let decoded;
+      try {
+        decoded = await firebaseAuth.verifyIdToken(token);
+      } catch (verifyError) {
+        throw new Response('Unauthorized: Invalid or expired token', { status: 401 });
+      }
+
       if (!decoded.uid) {
         throw new Response('Unauthorized: No user ID found in token', { status: 401 });
       }
@@ -45,7 +60,13 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
         },
       })
     } catch (error) {
-      throw new Response(`Unauthorized: Invalid token - ${error instanceof Error ? error.message : 'unknown error'}`, { status: 401 });
+      if (error instanceof Response) {
+        throw error;
+      }
+      throw new Response(
+        `Server Error: Unexpected auth error - ${error instanceof Error ? error.message : 'unknown error'}`,
+        { status: 500 }
+      );
     }
   }
 )
