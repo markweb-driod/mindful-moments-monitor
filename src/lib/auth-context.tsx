@@ -7,7 +7,7 @@ import {
   signOut as firebaseSignOut,
   type User,
 } from "firebase/auth";
-import { firebaseAuth } from "@/integrations/firebase/client";
+import { getFirebaseClientAuth } from "@/integrations/firebase/client";
 
 interface AppUser {
   id: string;
@@ -41,7 +41,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(firebaseAuth, (user) => {
+    const auth = getFirebaseClientAuth();
+    if (!auth) {
+      // Firebase not configured in this environment — treat as unauthenticated
+      setLoading(false);
+      return;
+    }
+    const unsub = onAuthStateChanged(auth, (user) => {
       setSession(user);
       setLoading(false);
     });
@@ -53,16 +59,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user: toAppUser(session),
     loading,
     async signInAnonymously() {
-      await firebaseSignInAnonymously(firebaseAuth);
+      const auth = getFirebaseClientAuth();
+      if (!auth) throw new Error("Firebase not configured");
+      await firebaseSignInAnonymously(auth);
     },
     async signInWithEmail(email, password) {
-      await firebaseSignInWithEmailAndPassword(firebaseAuth, email, password);
+      const auth = getFirebaseClientAuth();
+      if (!auth) throw new Error("Firebase not configured");
+      await firebaseSignInWithEmailAndPassword(auth, email, password);
     },
     async signUpWithEmail(email, password) {
-      await createUserWithEmailAndPassword(firebaseAuth, email, password);
+      const auth = getFirebaseClientAuth();
+      if (!auth) throw new Error("Firebase not configured");
+      await createUserWithEmailAndPassword(auth, email, password);
     },
     async signOut() {
-      await firebaseSignOut(firebaseAuth);
+      const auth = getFirebaseClientAuth();
+      if (!auth) return;
+      await firebaseSignOut(auth);
     },
   };
 
@@ -76,7 +90,8 @@ export function useAuth() {
 }
 
 export async function getAccessToken(): Promise<string> {
-  const user = firebaseAuth.currentUser;
+  const auth = getFirebaseClientAuth();
+  const user = auth?.currentUser;
   if (!user) throw new Error("Not signed in");
   return user.getIdToken();
 }
