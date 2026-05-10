@@ -8,25 +8,6 @@ import type { Database } from './types'
 
 export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server(
   async ({ next }) => {
-    const SUPABASE_URL = (
-      process.env.SUPABASE_URL ||
-      process.env.VITE_SUPABASE_URL ||
-      process.env.NEXT_PUBLIC_SUPABASE_URL
-    )?.trim();
-    const SUPABASE_PUBLISHABLE_KEY = (
-      process.env.SUPABASE_PUBLISHABLE_KEY ||
-      process.env.SUPABASE_ANON_KEY ||
-      process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    )?.trim();
-
-    if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-      throw new Response(
-        'Missing Supabase environment variables. Set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY (or SUPABASE_ANON_KEY / VITE_* / NEXT_PUBLIC_* variants).',
-        { status: 500 }
-      );
-    }
-    
     const request = getRequest();
 
     if (!request?.headers) {
@@ -46,6 +27,46 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
     const token = authHeader.replace('Bearer ', '');
     if (!token) {
       throw new Response('Unauthorized: No token provided', { status: 401 });
+    }
+
+    // Preferred auth path: Firebase ID token verification
+    try {
+      const { getFirebaseAdminAuth } = await import('@/integrations/firebase/admin.server');
+      const firebaseAuth = getFirebaseAdminAuth();
+      if (firebaseAuth) {
+        const decoded = await firebaseAuth.verifyIdToken(token);
+        if (!decoded.uid) {
+          throw new Response('Unauthorized: No user ID found in token', { status: 401 });
+        }
+
+        return next({
+          context: {
+            userId: decoded.uid,
+            claims: decoded,
+          },
+        })
+      }
+    } catch {
+      // Fall through to Supabase verification for backward compatibility.
+    }
+
+    const SUPABASE_URL = (
+      process.env.SUPABASE_URL ||
+      process.env.VITE_SUPABASE_URL ||
+      process.env.NEXT_PUBLIC_SUPABASE_URL
+    )?.trim();
+    const SUPABASE_PUBLISHABLE_KEY = (
+      process.env.SUPABASE_PUBLISHABLE_KEY ||
+      process.env.SUPABASE_ANON_KEY ||
+      process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    )?.trim();
+
+    if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+      throw new Response(
+        'Unauthorized: Invalid token',
+        { status: 401 }
+      );
     }
 
     const supabase = createClient<Database>(
@@ -76,7 +97,6 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
 
     return next({
       context: {
-        supabase,
         userId: data.claims.sub,
         claims: data.claims,
       },

@@ -1,4 +1,5 @@
 import { cert, getApps, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 
 function parseServiceAccountJson(raw: string) {
@@ -50,6 +51,12 @@ function getOrInitFirebaseAdminApp() {
     credential: cert(serviceAccount),
     projectId: process.env.FIREBASE_PROJECT_ID?.trim() || serviceAccount.projectId,
   });
+}
+
+export function getFirebaseAdminAuth() {
+  const app = getOrInitFirebaseAdminApp();
+  if (!app) return null;
+  return getAuth(app);
 }
 
 export function getFirestoreAdmin() {

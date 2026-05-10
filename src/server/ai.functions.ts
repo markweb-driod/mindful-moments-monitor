@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import type { Database, Json } from "@/integrations/supabase/types";
+import type { Json } from "@/integrations/supabase/types";
 import { z } from "zod";
 
 const EMOTIONS = [
@@ -313,8 +312,25 @@ async function clearHistoryFromFirebase(userId: string): Promise<boolean> {
   return true;
 }
 
+async function fetchHistoryFromSupabaseAdmin(userId: string): Promise<StoredAnalysis[]> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await supabaseAdmin
+    .from("analyses")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (error) throw error;
+  return (data ?? []) as unknown as StoredAnalysis[];
+}
+
+async function clearHistoryFromSupabaseAdmin(userId: string): Promise<void> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { error } = await supabaseAdmin.from("analyses").delete().eq("user_id", userId);
+  if (error) throw error;
+}
+
 async function persistAnalysis(
-  supabase: SupabaseClient<Database>,
   userId: string,
   modality: (typeof MODALITIES)[number],
   analysis: AIAnalysis,
@@ -324,7 +340,8 @@ async function persistAnalysis(
   if (firebaseSaved) return firebaseSaved;
 
   const payload = buildPersistPayload(userId, modality, analysis);
-  const { data, error } = await supabase
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await supabaseAdmin
     .from("analyses")
     .insert({
       user_id: payload.user_id,
@@ -341,33 +358,7 @@ async function persistAnalysis(
     })
     .select()
     .single();
-  if (error) {
-    // Fallback: try service-role client to bypass potential RLS/auth key issues
-    try {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data: fallbackData, error: fallbackError } = await supabaseAdmin
-        .from("analyses")
-        .insert({
-          user_id: payload.user_id,
-          modality_input: payload.modality_input,
-          predicted_label: payload.predicted_label,
-          confidence: payload.confidence,
-          wellbeing_score: payload.wellbeing_score,
-          risk_level: payload.risk_level,
-          scores: payload.scores as unknown as Json,
-          modalities: payload.modalities as unknown as Json,
-          highlights: payload.highlights as unknown as Json,
-          suggestions: payload.suggestions as unknown as Json,
-          input_preview: payload.input_preview,
-        })
-        .select()
-        .single();
-      if (fallbackError) throw new Error(`Failed to save analysis (service role fallback): ${fallbackError.message}`);
-      return fallbackData;
-    } catch (fallbackErr) {
-      throw new Error(`Failed to save analysis: ${error.message}`);
-    }
-  }
+  if (error) throw new Error(`Failed to save analysis: ${error.message}`);
   return data;
 }
 
@@ -402,7 +393,7 @@ export const analyzeText = createServerFn({ method: "POST" })
       suggestions: r.suggestions,
       inputPreview: data.text.slice(0, 200),
     };
-    const saved = await persistAnalysis(context.supabase, context.userId, "text", analysis);
+    const saved = await persistAnalysis(context.userId, "text", analysis);
     return { analysis, id: saved.id };
   });
 
@@ -442,7 +433,7 @@ export const analyzeFace = createServerFn({ method: "POST" })
       suggestions: r.suggestions,
       inputPreview: "[facial photo]",
     };
-    const saved = await persistAnalysis(context.supabase, context.userId, "face", analysis);
+    const saved = await persistAnalysis(context.userId, "face", analysis);
     return { analysis, id: saved.id };
   });
 
@@ -480,7 +471,7 @@ export const analyzeVoice = createServerFn({ method: "POST" })
       suggestions: r.suggestions,
       inputPreview: "[voice recording]",
     };
-    const saved = await persistAnalysis(context.supabase, context.userId, "voice", analysis);
+    const saved = await persistAnalysis(context.userId, "voice", analysis);
     return { analysis, id: saved.id };
   });
 
@@ -565,7 +556,7 @@ export const analyzeMultimodal = createServerFn({ method: "POST" })
       suggestions: summarized.suggestions,
       inputPreview: data.text ? data.text.slice(0, 200) : "[multi-modal session]",
     };
-    const saved = await persistAnalysis(context.supabase, context.userId, "multimodal", analysis);
+    const saved = await persistAnalysis(context.userId, "multimodal", analysis);
     return { analysis, id: saved.id };
   });
 
@@ -575,13 +566,8 @@ export const fetchAnalysisHistory = createServerFn({ method: "GET" })
     const firebaseHistory = await fetchHistoryFromFirebase(context.userId).catch(() => null);
     if (firebaseHistory) return { items: firebaseHistory };
 
-    const { data, error } = await context.supabase
-      .from("analyses")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(100);
-    if (error) throw error;
-    return { items: (data ?? []) as unknown as StoredAnalysis[] };
+    const items = await fetchHistoryFromSupabaseAdmin(context.userId);
+    return { items };
   });
 
 export const clearAnalysisHistory = createServerFn({ method: "POST" })
@@ -590,7 +576,6 @@ export const clearAnalysisHistory = createServerFn({ method: "POST" })
     const firebaseCleared = await clearHistoryFromFirebase(context.userId).catch(() => false);
     if (firebaseCleared) return { ok: true };
 
-    const { error } = await context.supabase.from("analyses").delete().eq("user_id", context.userId);
-    if (error) throw error;
+    await clearHistoryFromSupabaseAdmin(context.userId);
     return { ok: true };
   });

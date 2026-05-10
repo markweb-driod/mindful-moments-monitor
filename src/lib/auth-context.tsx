@@ -1,10 +1,23 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import type { Session, User } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  signInAnonymously as firebaseSignInAnonymously,
+  signInWithEmailAndPassword as firebaseSignInWithEmailAndPassword,
+  signOut as firebaseSignOut,
+  type User,
+} from "firebase/auth";
+import { firebaseAuth } from "@/integrations/firebase/client";
+
+interface AppUser {
+  id: string;
+  email: string | null;
+  is_anonymous: boolean;
+}
 
 interface AuthCtx {
-  session: Session | null;
-  user: User | null;
+  session: User | null;
+  user: AppUser | null;
   loading: boolean;
   signInAnonymously: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
@@ -14,44 +27,42 @@ interface AuthCtx {
 
 const Ctx = createContext<AuthCtx | null>(null);
 
+function toAppUser(user: User | null): AppUser | null {
+  if (!user) return null;
+  return {
+    id: user.uid,
+    email: user.email,
+    is_anonymous: user.isAnonymous,
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
+  const [session, setSession] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((_evt, s) => {
-      setSession(s);
-    });
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
+    const unsub = onAuthStateChanged(firebaseAuth, (user) => {
+      setSession(user);
       setLoading(false);
     });
-    return () => sub.subscription.unsubscribe();
+    return () => unsub();
   }, []);
 
   const value: AuthCtx = {
     session,
-    user: session?.user ?? null,
+    user: toAppUser(session),
     loading,
     async signInAnonymously() {
-      const { error } = await supabase.auth.signInAnonymously();
-      if (error) throw error;
+      await firebaseSignInAnonymously(firebaseAuth);
     },
     async signInWithEmail(email, password) {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
+      await firebaseSignInWithEmailAndPassword(firebaseAuth, email, password);
     },
     async signUpWithEmail(email, password) {
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) throw error;
-      // If Supabase returned no session (email confirmation still on), sign in immediately
-      if (!data.session) {
-        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-        if (signInError) throw signInError;
-      }
+      await createUserWithEmailAndPassword(firebaseAuth, email, password);
     },
     async signOut() {
-      await supabase.auth.signOut();
+      await firebaseSignOut(firebaseAuth);
     },
   };
 
@@ -65,7 +76,7 @@ export function useAuth() {
 }
 
 export async function getAccessToken(): Promise<string> {
-  const { data } = await supabase.auth.getSession();
-  if (!data.session?.access_token) throw new Error("Not signed in");
-  return data.session.access_token;
+  const user = firebaseAuth.currentUser;
+  if (!user) throw new Error("Not signed in");
+  return user.getIdToken();
 }
