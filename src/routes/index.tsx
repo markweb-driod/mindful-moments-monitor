@@ -60,23 +60,7 @@ function HomePage() {
         document.getElementById("result")?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 100);
     } catch (err: any) {
-      try {
-        const { buildAnalysis } = await import("@/lib/analyzer");
-        const local = buildAnalysis({ text });
-        setResult({
-          fused: local.fused,
-          risk: local.risk,
-          wellbeingScore: local.wellbeingScore,
-          highlights: local.highlights,
-          suggestions: local.suggestions,
-        });
-        toast.error("Server analysis unavailable. Showing local fallback.");
-        setTimeout(() => {
-          document.getElementById("result")?.scrollIntoView({ behavior: "smooth", block: "start" });
-        }, 100);
-      } catch {
-        toast.error(err?.message ?? "Analysis failed");
-      }
+      toast.error(err?.message ?? "Analysis failed. Please try again.");
     } finally {
       setAnalyzing(false);
     }

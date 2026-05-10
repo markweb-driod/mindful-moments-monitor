@@ -14,18 +14,28 @@ async function withAuth<T>(fn: (headers: HeadersInit) => Promise<T>): Promise<T>
   return fn({ Authorization: `Bearer ${token}` });
 }
 
+/** Try to get auth headers — silently skip if user isn't signed in yet. */
+async function tryWithAuth<T>(fn: (headers: HeadersInit) => Promise<T>): Promise<T> {
+  try {
+    const token = await getAccessToken();
+    return fn({ Authorization: `Bearer ${token}` });
+  } catch {
+    return fn({});
+  }
+}
+
 export type ServerAnalysis = Awaited<ReturnType<typeof analyzeText>>["analysis"];
 
 export async function runAnalyzeText(text: string) {
-  return withAuth((headers) => analyzeText({ data: { text }, headers }));
+  return tryWithAuth((headers) => analyzeText({ data: { text }, headers }));
 }
 
 export async function runAnalyzeFace(imageDataUrl: string) {
-  return withAuth((headers) => analyzeFace({ data: { imageDataUrl }, headers }));
+  return tryWithAuth((headers) => analyzeFace({ data: { imageDataUrl }, headers }));
 }
 
 export async function runAnalyzeVoice(audioDataUrl: string, mimeType: string) {
-  return withAuth((headers) => analyzeVoice({ data: { audioDataUrl, mimeType }, headers }));
+  return tryWithAuth((headers) => analyzeVoice({ data: { audioDataUrl, mimeType }, headers }));
 }
 
 export async function runAnalyzeMultimodal(input: {
@@ -34,7 +44,7 @@ export async function runAnalyzeMultimodal(input: {
   audioDataUrl?: string;
   audioMime?: string;
 }) {
-  return withAuth((headers) => analyzeMultimodal({ data: input, headers }));
+  return tryWithAuth((headers) => analyzeMultimodal({ data: input, headers }));
 }
 
 type HistoryServerResponse = Awaited<ReturnType<typeof fetchAnalysisHistory>>;
