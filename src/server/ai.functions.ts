@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import type { Json } from "@/integrations/supabase/types";
 import { z } from "zod";
 
 const EMOTIONS = [
@@ -312,54 +311,19 @@ async function clearHistoryFromFirebase(userId: string): Promise<boolean> {
   return true;
 }
 
-async function fetchHistoryFromSupabaseAdmin(userId: string): Promise<StoredAnalysis[]> {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await supabaseAdmin
-    .from("analyses")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(100);
-  if (error) throw error;
-  return (data ?? []) as unknown as StoredAnalysis[];
-}
 
-async function clearHistoryFromSupabaseAdmin(userId: string): Promise<void> {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { error } = await supabaseAdmin.from("analyses").delete().eq("user_id", userId);
-  if (error) throw error;
-}
 
 async function persistAnalysis(
   userId: string,
   modality: (typeof MODALITIES)[number],
   analysis: AIAnalysis,
 ) {
-  // Prefer Firebase if configured. Fall back to Supabase for compatibility.
-  const firebaseSaved = await persistAnalysisToFirebase(userId, modality, analysis).catch(() => null);
-  if (firebaseSaved) return firebaseSaved;
-
-  const payload = buildPersistPayload(userId, modality, analysis);
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await supabaseAdmin
-    .from("analyses")
-    .insert({
-      user_id: payload.user_id,
-      modality_input: payload.modality_input,
-      predicted_label: payload.predicted_label,
-      confidence: payload.confidence,
-      wellbeing_score: payload.wellbeing_score,
-      risk_level: payload.risk_level,
-      scores: payload.scores as unknown as Json,
-      modalities: payload.modalities as unknown as Json,
-      highlights: payload.highlights as unknown as Json,
-      suggestions: payload.suggestions as unknown as Json,
-      input_preview: payload.input_preview,
-    })
-    .select()
-    .single();
-  if (error) throw new Error(`Failed to save analysis: ${error.message}`);
-  return data;
+  // Firebase-only persistence
+  const firebaseSaved = await persistAnalysisToFirebase(userId, modality, analysis);
+  if (!firebaseSaved) {
+    throw new Error("Failed to save analysis: Firebase not configured");
+  }
+  return { id: firebaseSaved.id, ...buildPersistPayload(userId, modality, analysis) };
 }
 
 function combineHighlights(mods: AIAnalysis["modalities"], extra: string[] = []) {
@@ -563,19 +527,21 @@ export const analyzeMultimodal = createServerFn({ method: "POST" })
 export const fetchAnalysisHistory = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const firebaseHistory = await fetchHistoryFromFirebase(context.userId).catch(() => null);
-    if (firebaseHistory) return { items: firebaseHistory };
-
-    const items = await fetchHistoryFromSupabaseAdmin(context.userId);
+    // Firebase-only history fetch
+    const items = await fetchHistoryFromFirebase(context.userId);
+    if (!items) {
+      throw new Error("Failed to fetch history: Firebase not configured");
+    }
     return { items };
   });
 
 export const clearAnalysisHistory = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const firebaseCleared = await clearHistoryFromFirebase(context.userId).catch(() => false);
-    if (firebaseCleared) return { ok: true };
-
-    await clearHistoryFromSupabaseAdmin(context.userId);
+    // Firebase-only history clear
+    const cleared = await clearHistoryFromFirebase(context.userId);
+    if (!cleared) {
+      throw new Error("Failed to clear history: Firebase not configured");
+    }
     return { ok: true };
   });
