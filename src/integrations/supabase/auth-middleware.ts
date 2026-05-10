@@ -2,42 +2,54 @@
 import { createMiddleware } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
 
+class AuthError extends Error {
+  constructor(public statusCode: number, message: string) {
+    super(message);
+    this.name = 'AuthError';
+  }
+}
+
 export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server(
   async ({ next }) => {
-    const request = getRequest();
-
-    if (!request?.headers) {
-      throw new Error('Unauthorized: No request headers available');
-    }
-
-    const authHeader = request.headers.get('authorization');
-
-    if (!authHeader) {
-      throw new Error('Unauthorized: No authorization header provided');
-    }
-
-    if (!authHeader.startsWith('Bearer ')) {
-      throw new Error('Unauthorized: Only Bearer tokens are supported');
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    if (!token) {
-      throw new Error('Unauthorized: No token provided');
-    }
-
-    // Firebase ID token verification (required)
     try {
+      const request = getRequest();
+
+      if (!request?.headers) {
+        throw new AuthError(401, 'No request headers available');
+      }
+
+      const authHeader = request.headers.get('authorization');
+
+      if (!authHeader) {
+        throw new AuthError(401, 'No authorization header provided');
+      }
+
+      if (!authHeader.startsWith('Bearer ')) {
+        throw new AuthError(401, 'Only Bearer tokens are supported');
+      }
+
+      const token = authHeader.replace('Bearer ', '');
+      if (!token) {
+        throw new AuthError(401, 'No token provided');
+      }
+
+      // Firebase ID token verification (required)
       const { getFirebaseAdminAuth } = await import('@/integrations/firebase/admin.server');
       const firebaseAuth = getFirebaseAdminAuth();
       
       if (!firebaseAuth) {
-        throw new Error('Firebase not configured');
+        throw new AuthError(503, 'Firebase not configured - service temporarily unavailable');
       }
 
-      const decoded = await firebaseAuth.verifyIdToken(token);
-      
+      let decoded;
+      try {
+        decoded = await firebaseAuth.verifyIdToken(token);
+      } catch (verifyError) {
+        throw new AuthError(401, 'Invalid or expired token');
+      }
+
       if (!decoded.uid) {
-        throw new Error('No user ID found in token');
+        throw new AuthError(401, 'No user ID found in token');
       }
 
       return next({
@@ -47,9 +59,10 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
         },
       })
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown auth error';
-      throw new Error(`Unauthorized: ${message}`);
+      if (error instanceof AuthError) {
+        throw new Response(error.message, { status: error.statusCode });
+      }
+      throw new Response('Internal server error', { status: 500 });
     }
   }
 )
-
