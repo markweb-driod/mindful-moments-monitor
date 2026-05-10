@@ -392,21 +392,38 @@ export const analyzeText = createServerFn({ method: "POST" })
     z.object({ text: z.string().trim().min(5).max(4000) }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    const r = await callGemini([
-      {
-        text: `Analyze the emotional state expressed in this journal entry:\n\n"""${data.text}"""`,
-      },
-    ]);
-    const modScore: ModalityScore = { label: r.label, confidence: r.confidence, scores: r.scores };
-    const analysis: AIAnalysis = {
-      modalities: { text: modScore },
-      fused: modScore,
-      risk: r.risk,
-      wellbeingScore: r.wellbeingScore,
-      highlights: r.highlights,
-      suggestions: r.suggestions,
-      inputPreview: data.text.slice(0, 200),
-    };
+    let analysis: AIAnalysis;
+    try {
+      const r = await callGemini([
+        {
+          text: `Analyze the emotional state expressed in this journal entry:\n\n"""${data.text}"""`,
+        },
+      ]);
+      const modScore: ModalityScore = { label: r.label, confidence: r.confidence, scores: r.scores };
+      analysis = {
+        modalities: { text: modScore },
+        fused: modScore,
+        risk: r.risk,
+        wellbeingScore: r.wellbeingScore,
+        highlights: r.highlights,
+        suggestions: r.suggestions,
+        inputPreview: data.text.slice(0, 200),
+      };
+    } catch {
+      // Keep analysis available even if external AI is temporarily unavailable.
+      const { buildAnalysis } = await import("@/lib/analyzer");
+      const local = buildAnalysis({ text: data.text });
+      const textMod = local.modalities.text || local.fused;
+      analysis = {
+        modalities: { text: textMod },
+        fused: local.fused,
+        risk: local.risk,
+        wellbeingScore: local.wellbeingScore,
+        highlights: [...local.highlights, "Used local fallback analysis due to temporary AI service issue."],
+        suggestions: local.suggestions,
+        inputPreview: data.text.slice(0, 200),
+      };
+    }
     const saved = await persistAnalysis(context.userId, "text", analysis);
     return { analysis, id: saved.id };
   });
