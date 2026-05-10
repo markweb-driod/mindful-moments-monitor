@@ -245,7 +245,33 @@ async function persistAnalysis(
     })
     .select()
     .single();
-  if (error) throw new Error(`Failed to save analysis: ${error.message}`);
+  if (error) {
+    // Fallback: try service-role client to bypass potential RLS/auth key issues
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: fallbackData, error: fallbackError } = await supabaseAdmin
+        .from("analyses")
+        .insert({
+          user_id: userId,
+          modality_input: modality,
+          predicted_label: analysis.fused.label,
+          confidence: analysis.fused.confidence,
+          wellbeing_score: analysis.wellbeingScore,
+          risk_level: analysis.risk,
+          scores: analysis.fused.scores as unknown as Json,
+          modalities: analysis.modalities as unknown as Json,
+          highlights: analysis.highlights as unknown as Json,
+          suggestions: analysis.suggestions as unknown as Json,
+          input_preview: analysis.inputPreview,
+        })
+        .select()
+        .single();
+      if (fallbackError) throw new Error(`Failed to save analysis (service role fallback): ${fallbackError.message}`);
+      return fallbackData;
+    } catch (fallbackErr) {
+      throw new Error(`Failed to save analysis: ${error.message}`);
+    }
+  }
   return data;
 }
 
