@@ -35,7 +35,7 @@ function AuthPage() {
     try {
       await fn();
       toast.success(msg);
-      navigate({ to: "/" });
+      navigate({ to: "/history" });
     } catch (e: any) {
       toast.error(e?.message ?? "Authentication failed");
     } finally {

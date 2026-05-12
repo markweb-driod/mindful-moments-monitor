@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { ResultDisplay, type DisplayResult } from "@/components/ResultDisplay";
 import { runAnalyzeText } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import { Mic, Camera, Layers, Sparkles, Brain, ShieldCheck, ArrowRight, Loader2, Lock, Heart, Activity } from "lucide-react";
 import { toast } from "sonner";
 import heroImg from "@/assets/hero-bloom.jpg";
@@ -26,6 +27,7 @@ const MIN_LEN = 10;
 const MAX_LEN = 2000;
 
 function HomePage() {
+  const { user } = useAuth();
   const [text, setText] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<DisplayResult | null>(null);
@@ -68,6 +70,7 @@ function HomePage() {
 
   return (
     <SiteLayout requireAuth={false}>
+      {!user && (
       <section className="relative overflow-hidden border-b border-border">
         <div className="absolute inset-0 -z-10" style={{ background: "var(--gradient-hero)" }} aria-hidden />
         <div className="container mx-auto px-6 pt-16 pb-20 md:pt-24 md:pb-28 grid md:grid-cols-12 gap-10 lg:gap-14 items-center">
@@ -132,12 +135,17 @@ function HomePage() {
           </div>
         </div>
       </section>
+      )}
 
       <section id="analyze" className="container mx-auto px-6 py-16">
         <div className="max-w-3xl mx-auto text-center mb-10">
-          <h2 className="font-display text-4xl font-semibold tracking-tight">How are you feeling today?</h2>
+          <h2 className="font-display text-4xl font-semibold tracking-tight">
+            {user ? "Welcome back. How are you feeling today?" : "How are you feeling today?"}
+          </h2>
           <p className="text-muted-foreground mt-3 text-lg">
-            Describe your thoughts in your own words. The system will analyze and respond.
+            {user
+              ? "Write a quick check-in and get your latest wellbeing analysis."
+              : "Describe your thoughts in your own words. The system will analyze and respond."}
           </p>
         </div>
 
@@ -176,6 +184,7 @@ function HomePage() {
         )}
       </section>
 
+      {!user && (
       <section className="container mx-auto px-6 pb-10">
         <Card className="p-8 md:p-10 bg-gradient-to-br from-primary/15 via-card to-accent/15 border-border">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
@@ -193,6 +202,7 @@ function HomePage() {
           </div>
         </Card>
       </section>
+      )}
     </SiteLayout>
   );
 }

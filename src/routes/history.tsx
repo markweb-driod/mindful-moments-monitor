@@ -21,7 +21,7 @@ export const Route = createFileRoute("/history")({
 });
 
 function HistoryPage() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [items, setItems] = useState<HistoryRow[] | null>(null);
   const hasShownGuestHint = useRef(false);
 
@@ -35,8 +35,9 @@ function HistoryPage() {
     }
   };
   useEffect(() => {
+    if (loading) return;
     load();
-  }, []);
+  }, [loading, user?.id]);
 
   useEffect(() => {
     if (hasShownGuestHint.current) return;
