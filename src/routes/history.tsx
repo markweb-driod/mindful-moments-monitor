@@ -1,10 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SiteLayout } from "@/components/SiteLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { fetchHistory, clearHistoryRemote, type HistoryRow } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import { EMOTION_COLORS } from "@/components/ResultDisplay";
 import { Trash2, History as HistoryIcon, TrendingUp, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -20,7 +21,9 @@ export const Route = createFileRoute("/history")({
 });
 
 function HistoryPage() {
+  const { user } = useAuth();
   const [items, setItems] = useState<HistoryRow[] | null>(null);
+  const hasShownGuestHint = useRef(false);
 
   const load = async () => {
     try {
@@ -34,6 +37,15 @@ function HistoryPage() {
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    if (hasShownGuestHint.current) return;
+    if (!user?.is_anonymous) return;
+    if (!items || items.length > 0) return;
+
+    hasShownGuestHint.current = true;
+    toast.info("Guest sessions may not sync across devices. Sign in to keep a persistent history.");
+  }, [items, user]);
 
   const onClear = async () => {
     if (!confirm("Delete all your sessions? This cannot be undone.")) return;
