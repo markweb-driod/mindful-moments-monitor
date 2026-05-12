@@ -27,7 +27,7 @@ function AuthPage() {
   const [password, setPassword] = useState("");
 
   useEffect(() => {
-    if (user) navigate({ to: "/" });
+    if (user) navigate({ to: "/history" });
   }, [user, navigate]);
 
   const wrap = async (fn: () => Promise<void>, msg: string) => {

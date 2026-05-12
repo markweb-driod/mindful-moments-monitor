@@ -625,14 +625,14 @@ export const fetchAnalysisHistory = createServerFn({ method: "GET" })
 
     // Try Firebase first.
     const firebaseItems = await fetchHistoryFromFirebase(userId).catch(() => null);
-    if (firebaseItems) return { items: firebaseItems };
+    if (firebaseItems && firebaseItems.length > 0) return { items: firebaseItems };
 
-    // Fallback to Supabase if configured; otherwise return empty history.
+    // Fallback to Supabase if configured, or when Firebase has no rows.
     if (hasSupabaseAdminConfig()) {
       const items = await fetchHistoryFromSupabaseAdmin(userId).catch(() => []);
       return { items };
     }
-    return { items: [] };
+    return { items: firebaseItems ?? [] };
   });
 
 export const clearAnalysisHistory = createServerFn({ method: "POST" })
