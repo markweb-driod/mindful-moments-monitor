@@ -619,30 +619,34 @@ export const analyzeMultimodal = createServerFn({ method: "POST" })
   });
 
 export const fetchAnalysisHistory = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .handler(async () => {
+    const userId = await tryGetUserId();
+    if (!userId) return { items: [] };
+
     // Try Firebase first.
-    const firebaseItems = await fetchHistoryFromFirebase(context.userId).catch(() => null);
+    const firebaseItems = await fetchHistoryFromFirebase(userId).catch(() => null);
     if (firebaseItems) return { items: firebaseItems };
 
     // Fallback to Supabase if configured; otherwise return empty history.
     if (hasSupabaseAdminConfig()) {
-      const items = await fetchHistoryFromSupabaseAdmin(context.userId).catch(() => []);
+      const items = await fetchHistoryFromSupabaseAdmin(userId).catch(() => []);
       return { items };
     }
     return { items: [] };
   });
 
 export const clearAnalysisHistory = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .handler(async () => {
+    const userId = await tryGetUserId();
+    if (!userId) return { ok: true };
+
     // Try Firebase first.
-    const cleared = await clearHistoryFromFirebase(context.userId).catch(() => false);
+    const cleared = await clearHistoryFromFirebase(userId).catch(() => false);
     if (cleared) return { ok: true };
 
     // Fallback to Supabase only if configured.
     if (hasSupabaseAdminConfig()) {
-      await clearHistoryFromSupabaseAdmin(context.userId).catch(() => undefined);
+      await clearHistoryFromSupabaseAdmin(userId).catch(() => undefined);
     }
     return { ok: true };
   });

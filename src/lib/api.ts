@@ -64,12 +64,14 @@ export interface HistoryRow {
 }
 
 export async function fetchHistory(): Promise<HistoryRow[]> {
-  return withAuth(async (headers) => {
-    const { items } = (await fetchAnalysisHistory({ headers })) as HistoryServerResponse;
+  return tryWithAuth(async (headers) => {
+    const res = (await fetchAnalysisHistory({ headers })) as HistoryServerResponse | undefined;
+    const items = (res as { items?: unknown } | undefined)?.items;
+    if (!Array.isArray(items)) return [];
     return items as unknown as HistoryRow[];
   });
 }
 
 export async function clearHistoryRemote() {
-  await withAuth((headers) => clearAnalysisHistory({ headers }));
+  await tryWithAuth((headers) => clearAnalysisHistory({ headers }));
 }

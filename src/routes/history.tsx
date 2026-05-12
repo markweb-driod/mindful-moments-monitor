@@ -24,7 +24,8 @@ function HistoryPage() {
 
   const load = async () => {
     try {
-      setItems(await fetchHistory());
+      const rows = await fetchHistory();
+      setItems(Array.isArray(rows) ? rows : []);
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to load history");
       setItems([]);
